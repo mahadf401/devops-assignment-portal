@@ -33,24 +33,12 @@ jobs:
     - name: Send Report Webhook
       if: always()
       run: |
-        STATUS="passed"
-        if [ "$TEST_EXIT_CODE" -ne "0" ]; then
+        if [ "$TEST_EXIT_CODE" -eq "0" ]; then
+          STATUS="passed"
+        else
           STATUS="failed"
         fi
-
-        PAYLOAD=$(cat <<EOF
-        {
-          "status": "$STATUS",
-          "repository": "$GITHUB_REPOSITORY",
-          "commit": "$GITHUB_SHA",
-          "run_id": "$GITHUB_RUN_ID"
-        }
-        EOF
-        )
-
-        curl -s -X POST "${{ secrets.RECEIVER_URL }}" \
-          -H "Content-Type: application/json" \
-          -d "$PAYLOAD" || true
+        curl -X POST "${{ secrets.RECEIVER_URL }}" -H "Content-Type: application/json" -d "{\"status\":\"$STATUS\",\"repository\":\"$GITHUB_REPOSITORY\",\"commit\":\"$GITHUB_SHA\",\"run_id\":\"$GITHUB_RUN_ID\"}"
 
     - name: Enforce Test Success
       run: |
