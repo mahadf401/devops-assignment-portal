@@ -5,17 +5,16 @@ app = Flask(__name__)
 
 @app.route('/report', methods=['POST'])
 def receive_report():
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "No JSON payload provided"}), 400
-    
-    file_path = "test-report.json"
-    with open(file_path, "w") as f:
-        json.dump(data, f, indent=4)
-        
-    print(f"\n[SUCCESS] Received test report for commit {data.get('commit_sha')}. Saved to {file_path}")
-    return jsonify({"status": "received", "saved_to": file_path}), 200
+    try:
+        data = request.get_json(force=True)
+        # Write the incoming JSON report directly to disk as required by Task 4
+        with open('test-report.json', 'w') as f:
+            json.dump(data, f, indent=4)
+        print("\n[+] Webhook received and saved to test-report.json successfully!")
+        return jsonify({"status": "success", "message": "Report saved to test-report.json"}), 200
+    except Exception as e:
+        print(f"[-] Error saving report: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 400
 
 if __name__ == '__main__':
-    print("Local HTTP Receiver running at http://localhost:5000/report...")
     app.run(host='0.0.0.0', port=5000)

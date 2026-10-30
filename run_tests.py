@@ -1,69 +1,61 @@
-import subprocess
+import pytest
 import json
 import os
-import datetime
-import urllib.request
-import sys
+import requests
+from datetime import datetime
+
+class TestReportCollector:
+    def __init__(self):
+        self.tests = []
+
+    def pytest_runtest_logreport(self, report):
+        if report.when == 'call':
+            failure_msg = str(report.longrepr) if report.failed else ""
+            self.tests.append({
+                "name": report.nodeid,
+                "result": report.outcome,  # 'passed' or 'failed'
+                "failure_message": failure_msg
+            })
 
 def main():
-    res = subprocess.run(["pytest", "test_app.py", "--json-report", "--json-report-file=pytest_out.json"], capture_output=True, text=True)
-    
-    pytest_data = {}
-    if os.path.exists("pytest_out.json"):
-        with open("pytest_out.json") as f:
-            pytest_data = json.load(f)
-            
-    repo_name = os.environ.get("GITHUB_REPOSITORY", "local/repo")
-    branch_name = os.environ.get("GITHUB_REF_NAME", "main")
-    commit_sha = os.environ.get("GITHUB_SHA", "local_sha")
-    run_id = os.environ.get("GITHUB_RUN_ID", "1")
-    receiver_url = os.environ.get("RECEIVER_URL", "")
+    collector = TestReportCollector()
+    # Execute pytest tests programmatically
+    exit_code = pytest.main(["-v"], plugins=[collector])
 
-    tests_summary = []
-    total = pytest_data.get("summary", {}).get("total", 0)
-    passed = pytest_data.get("summary", {}).get("passed", 0)
-    failed = pytest_data.get("summary", {}).get("failed", 0)
-    
-    for t in pytest_data.get("tests", []):
-        t_name = t.get("nodeid", "unknown_test")
-        t_outcome = t.get("outcome", "failed")
-        t_fail_msg = str(t.get("call", {}).get("longrepr", "")) if t_outcome != "passed" else ""
-        tests_summary.append({
-            "test_name": t_name,
-            "result": t_outcome,
-            "failure_message": t_fail_msg
-        })
+    total = len(collector.tests)
+    passed = sum(1 for t in collector.tests if t["result"] == "passed")
+    failed = sum(1 for t in collector.tests if t["result"] == "failed")
+    overall_status = "passed" if exit_code == 0 else "failed"
 
-    overall_status = "passed" if res.returncode == 0 else "failed"
-
-    report_payload = {
-        "repository": repo_name,
-        "branch": branch_name,
-        "commit_sha": commit_sha,
-        "pipeline_run_id": run_id,
-        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+    # Construct the JSON schema explicitly required by Task 4 rubric
+    report_data = {
+        "repository": os.environ.get("GITHUB_REPOSITORY", "mahadf401/devops-assignment-portal"),
+        "branch": os.environ.get("GITHUB_REF_NAME", "main"),
+        "commit_sha": os.environ.get("GITHUB_SHA", "local-commit"),
+        "run_id": os.environ.get("GITHUB_RUN_ID", "local-run"),
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "overall_status": overall_status,
         "summary": {
-            "total_tests": total,
-            "passed_tests": passed,
-            "failed_tests": failed,
-            "overall_status": overall_status
+            "total": total,
+            "passed": passed,
+            "failed": failed
         },
-        "tests": tests_summary
+        "tests": collector.tests
     }
 
+    # Transmit payload to RECEIVER_URL secret via SSH Tunnel
+    receiver_url = os.environ.get("RECEIVER_URL")
     if receiver_url:
         try:
-            req = urllib.request.Request(
-                receiver_url,
-                data=json.dumps(report_payload).encode('utf-8'),
-                headers={'Content-Type': 'application/json'}
-            )
-            with urllib.request.urlopen(req) as resp:
-                print(f"[CI] Report transmitted to {receiver_url}. HTTP {resp.status}")
+            res = requests.post(receiver_url, json=report_data, timeout=10)
+            print(f"[+] Webhook posted to {receiver_url}. HTTP Status: {res.status_code}")
         except Exception as e:
-            print(f"[CI ERROR] Transmission failed: {e}")
+            print(f"[-] Failed to deliver report webhook: {e}")
+    else:
+        print("[-] RECEIVER_URL environment variable not set.")
 
-    sys.exit(res.returncode)
+    # Enforce CI failure if tests failed
+    raise SystemExit(exit_code)
 
 if __name__ == "__main__":
     main()
