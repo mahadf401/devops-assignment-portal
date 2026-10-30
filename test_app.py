@@ -46,7 +46,7 @@ def test_invalid_url(client):
         "submission_url": "invalid-url-without-http"
     }
     response = client.post('/submit', json=payload)
-    assert response.status_code == 200
+    assert response.status_code == 400
     data = response.get_json()
     assert data["status"] == "error"
     assert "Invalid submission URL" in data["message"]

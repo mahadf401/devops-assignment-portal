@@ -1,0 +1,30 @@
+{
+    "repository": "mahadf401/devops-assignment-portal",
+    "branch": "main",
+    "commit_sha": "59156b6aa305bbfd6aa5373d64ee712b41916d3a",
+    "run_id": "41032121072",
+    "timestamp": "2026-10-30T09:15:52.215287Z",
+    "overall_status": "failed",
+    "summary": {
+        "total": 3,
+        "passed": 2,
+        "failed": 1
+    },
+    "tests": [
+        {
+            "name": "test_app.py::test_valid_submission",
+            "result": "passed",
+            "failure_message": ""
+        },
+        {
+            "name": "test_app.py::test_missing_reg_num",
+            "result": "passed",
+            "failure_message": ""
+        },
+        {
+            "name": "test_app.py::test_invalid_url",
+            "result": "failed",
+            "failure_message": "client = <FlaskClient <Flask 'app'>>\n\n    def test_invalid_url(client):\n        \"\"\"Test Case 3: Invalid submission URL\"\"\"\n        payload = {\n            \"student_name\": \"Alex Johnson\",\n            \"reg_num\": \"FA20-BCS-002\",\n            \"title\": \"DevOps Assignment 1\",\n            \"submission_url\": \"invalid-url-without-http\"\n        }\n        response = client.post('/submit', json=payload)\n>       assert response.status_code == 200\nE       assert 400 == 200\nE        +  where 400 = <WrapperTestResponse streamed [400 BAD REQUEST]>.status_code\n\ntest_app.py:49: AssertionError"
+        }
+    ]
+}
